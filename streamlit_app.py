@@ -2,12 +2,16 @@
 
     .venv/bin/streamlit run streamlit_app.py
 
-Secrets (in .streamlit/secrets.toml or the Streamlit Cloud settings), both optional:
-    DATABASE_URL  Postgres address; without it answers go to a local SQLite file
+By default nothing is stored: the app only shows recommendations ("mode coba"). Storing answers
+and feedback is switched on with secrets (in .streamlit/secrets.toml or the Streamlit Cloud settings):
+    SIMPAN_DATA   "true" to store sessions, answers and feedback (adds the consent box, the
+                  teacher code, the feedback form and the export page)
+    DATABASE_URL  Postgres address; without it stored answers go to a local SQLite file
     ADMIN_TOKEN   password for the data export page (open the app with ?admin=1)
 """
 import hmac
 import os
+import secrets as token_source
 
 import streamlit as st
 
@@ -41,19 +45,22 @@ def warm_up():
     return True
 
 
+STORING = str(secret("SIMPAN_DATA") or "").strip().lower() in ("1", "true", "ya", "yes")
+
 state = st.session_state
-store = get_store()
+store = get_store() if STORING else None
 warm_up()
 
 
 # ---------------------------------------------------------------- session helpers
-def open_session(session_id, row, session):
+def open_session(session_id, session, max_job_zone, finished_early=False):
     state.sid = session_id
     state.session = session
-    state.max_job_zone = row["max_job_zone"]
-    state.finished_early = bool(row["finished_early"])
-    state.feedback_given = store.get_feedback(session_id) is not None
-    st.query_params["s"] = session_id
+    state.max_job_zone = max_job_zone
+    state.finished_early = finished_early
+    state.feedback_given = STORING and store.get_feedback(session_id) is not None
+    if STORING:   # the link lets a reload continue from the stored answers
+        st.query_params["s"] = session_id
 
 
 def reset():
@@ -67,19 +74,21 @@ def resume_from_link():
     session_id = st.query_params.get("s")
     if "sid" in state or not session_id:
         return
-    found = store.get_session(session_id)
+    found = store.get_session(session_id) if STORING else None
     if found is None:
         st.query_params.clear()
         return
     row, answers = found
-    open_session(session_id, row, service.rebuild_session(answers))
+    open_session(session_id, service.rebuild_session(answers), row["max_job_zone"], bool(row["finished_early"]))
 
 
-def start(max_job_zone, cohort):
-    cohort = (cohort or "").strip()[:40] or None
-    session_id = store.create_session(max_job_zone, consent=True, cohort=cohort)
-    row, _ = store.get_session(session_id)
-    open_session(session_id, row, adaptive.Session())
+def start(max_job_zone, cohort=None):
+    if STORING:
+        cohort = (cohort or "").strip()[:40] or None
+        session_id = store.create_session(max_job_zone, consent=True, cohort=cohort)
+    else:
+        session_id = token_source.token_urlsafe(12)   # only lives in this browser tab
+    open_session(session_id, adaptive.Session(), max_job_zone)
 
 
 def record_answer(question, value, expected_seq):
@@ -88,12 +97,14 @@ def record_answer(question, value, expected_seq):
     if seq != expected_seq:   # a second click on an already answered question
         return
     session.answer(question, value)
-    store.add_answer(state.sid, seq, question.kind, question.index, value, question.repeat)
+    if STORING:
+        store.add_answer(state.sid, seq, question.kind, question.index, value, question.repeat)
 
 
 def finish_now():
     state.finished_early = True
-    store.mark_finished(state.sid, state.session.outcome, early=True)
+    if STORING:
+        store.mark_finished(state.sid, state.session.outcome, early=True)
 
 
 # ---------------------------------------------------------------- views
@@ -106,8 +117,14 @@ def view_home():
                 "3. Jangan pikirkan gaji atau pendidikan yang dibutuhkan.")
     plan = st.selectbox("Rencana pendidikanmu", list(service.EDUCATION_PLANS),
                         help="Dipakai untuk menyaring pekerjaan yang butuh pendidikan lebih tinggi dari rencanamu.")
-    cohort = st.text_input("Kode dari guru (opsional)", max_chars=40, placeholder="Kosongkan jika tidak diberi kode")
+    if not STORING:
+        st.caption("Hasilnya bahan eksplorasi, bukan keputusan atau tes psikologi resmi. Jawabanmu tidak disimpan.")
+        if st.button("Mulai", type="primary"):
+            start(service.EDUCATION_PLANS[plan])
+            st.rerun()
+        return
 
+    cohort = st.text_input("Kode dari guru (opsional)", max_chars=40, placeholder="Kosongkan jika tidak diberi kode")
     with st.container(border=True):
         st.subheader("Tentang datamu")
         st.write("Aplikasi ini adalah proyek mahasiswa. Hasilnya bahan eksplorasi, bukan keputusan atau "
@@ -211,12 +228,17 @@ def view_result():
             with st.expander("Lihat detail"):
                 render_detail(r["code"])
 
-    view_feedback(result)
+    if STORING:
+        view_feedback(result)
     st.button("Ulangi dari awal", type="tertiary", on_click=reset)
 
 
 def view_admin():
     st.title("Ekspor data")
+    if not STORING:
+        st.info("Aplikasi berjalan dalam mode coba: tidak ada jawaban yang disimpan, jadi tidak ada yang "
+                "bisa diekspor. Isi SIMPAN_DATA = \"true\" di pengaturan rahasia untuk menyalakan penyimpanan.")
+        return
     expected = secret("ADMIN_TOKEN")
     if not expected:
         st.error("Ekspor belum diaktifkan: ADMIN_TOKEN belum diisi di pengaturan rahasia aplikasi.")
@@ -250,7 +272,7 @@ def main():
         if question is not None:
             view_question(question)
         else:
-            if not state.finished_early and state.get("marked_finished") != state.sid:
+            if STORING and not state.finished_early and state.get("marked_finished") != state.sid:
                 store.mark_finished(state.sid, state.session.outcome)
                 state.marked_finished = state.sid
             view_result()

@@ -13,8 +13,18 @@ python3 -m venv .venv
 .venv/bin/streamlit run streamlit_app.py
 ```
 
-Aplikasi terbuka di `http://localhost:8501`. Tanpa pengaturan apa pun, jawaban disimpan di berkas
-`data/crs.sqlite3` (tidak ikut ke repo).
+Aplikasi terbuka di `http://localhost:8501`.
+
+## Dua mode
+
+| | Mode coba (bawaan) | Mode uji coba |
+|---|---|---|
+| Menyalakan | Tidak perlu pengaturan | `SIMPAN_DATA = "true"` di Secrets |
+| Jawaban disimpan | Tidak | Ya (SQLite lokal, atau Postgres bila `DATABASE_URL` diisi) |
+| Kotak persetujuan dan kode dari guru | Tidak ada | Ada |
+| Form penilaian setelah hasil | Tidak ada | Ada |
+| Halaman ekspor (`?admin=1`) | Mati | Aktif bila `ADMIN_TOKEN` diisi |
+| Muat ulang halaman | Mulai dari awal | Melanjutkan sesi |
 
 `requirements.txt` hanya berisi kebutuhan aplikasi Streamlit; `requirements-dev.txt` menambah kebutuhan tes,
 tampilan FastAPI, dan skrip eksperimen.
@@ -23,9 +33,9 @@ Tes: `.venv/bin/python -m unittest discover tests`
 
 ## Memasang di Streamlit Community Cloud
 
-**Untuk demo**, cukup langkah 2: tanpa Secrets apa pun aplikasi tetap jalan dan menyimpan jawaban di
-berkas sementara. Berkas itu bisa hilang saat aplikasi dinyalakan ulang, jadi **untuk uji coba ke siswa**
-jawaban harus disimpan di Postgres daring (langkah 1, 3, dan 4).
+**Untuk demo**, cukup langkah 2: tanpa Secrets apa pun aplikasi berjalan dalam mode coba dan tidak
+menyimpan apa pun. **Untuk uji coba ke siswa**, nyalakan penyimpanan dan pakai Postgres daring
+(langkah 1, 3, dan 4), karena berkas di server Streamlit Cloud bisa hilang saat aplikasi dinyalakan ulang.
 
 1. Buat basis data Postgres gratis (misalnya di Neon) dan salin alamat koneksinya
    (`postgresql://...`). Tabel dibuat otomatis saat aplikasi pertama kali jalan.
@@ -35,6 +45,7 @@ jawaban harus disimpan di Postgres daring (langkah 1, 3, dan 4).
 3. Di **Advanced settings → Secrets**, isi (contoh ada di `.streamlit/secrets.toml.example`):
 
    ```toml
+   SIMPAN_DATA = "true"
    DATABASE_URL = "postgresql://USER:PASSWORD@HOST:5432/DBNAME"
    ADMIN_TOKEN = "kata-sandi-panjang-untuk-ekspor"
    ```

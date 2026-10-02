@@ -22,11 +22,13 @@ class StreamlitAppTest(unittest.TestCase):
         self.db = os.path.join(self.tmp.name, "test.sqlite3")
         os.environ["CRS_DB"] = self.db
         os.environ["CRS_ADMIN_TOKEN"] = "rahasia"
+        os.environ["CRS_SIMPAN_DATA"] = "true"
         os.environ.pop("DATABASE_URL", None)
 
     def tearDown(self):
         os.environ.pop("CRS_DB", None)
         os.environ.pop("CRS_ADMIN_TOKEN", None)
+        os.environ.pop("CRS_SIMPAN_DATA", None)
         self.tmp.cleanup()
 
     def app(self, **query):
@@ -107,6 +109,25 @@ class StreamlitAppTest(unittest.TestCase):
     def test_unknown_session_link_falls_back_to_home(self):
         at = self.app(s="tidak-ada")
         self.assertIn("Temukan karier", at.title[0].value)
+
+    def test_trial_mode_stores_nothing(self):
+        del os.environ["CRS_SIMPAN_DATA"]
+        at = self.app()
+        self.assertEqual(len(at.checkbox), 0)                     # no consent box
+        self.assertEqual(len(at.text_input), 0)                   # no teacher code
+        self.assertTrue(any("tidak disimpan" in c.value for c in at.caption))
+        at.button[0].click().run()                                # "Mulai" works straight away
+        self.assertNotIn("s", at.query_params)
+        self.complete(at, lambda text: 3)
+        self.assertFalse(at.exception, at.exception)
+        self.assertIn("Minatmu cukup beragam", at.title[0].value)
+        self.assertGreaterEqual(len([s for s in at.subheader if s.value[0].isdigit()]), 5)
+        self.assertEqual(len(at.radio), 0)                        # no feedback form
+        self.assertFalse(os.path.exists(self.db))                 # nothing was written anywhere
+
+        admin = self.app(admin="1")
+        self.assertTrue(any("mode coba" in i.value for i in admin.info))
+        self.assertEqual(len(admin.text_input), 0)
 
     def test_admin_export_needs_the_password(self):
         at = self.app(admin="1")
