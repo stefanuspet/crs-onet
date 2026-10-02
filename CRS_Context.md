@@ -1,4 +1,4 @@
-# CRS — Sistem Rekomendasi Karier Siswa SMA Berbasis O*NET
+# CRS — Sistem Rekomendasi Karier Siswa SMA Berbasis O*NET (Capstone Project)
 
 Dokumen ini adalah brief untuk melanjutkan pengembangan. Ia menggantikan
 `CRS_ONET_Knowledge_Graph_PPR_Context.md` (arah lama, disimpan sebagai arsip).
@@ -7,11 +7,20 @@ Terakhir diperbarui: 2 Oktober 2026.
 
 ## 1. Tujuan
 
-Skripsi: sistem rekomendasi karier untuk **siswa SMA**, memakai data **O*NET 31.0**.
+**Capstone project** (bukan skripsi penelitian): sistem rekomendasi karier untuk **siswa SMA**,
+memakai data **O*NET 31.0**. Dosen mensyaratkan ada algoritma, tanpa daftar tertentu.
 
-- **Metode utama:** Content-Based Filtering dengan Pearson Correlation.
-- **Metode pembanding:** Personalized PageRank (PPR) pada graph O*NET.
+Karena capstone, yang dinilai terutama produk yang berfungsi dan berguna bagi pengguna, bukan
+kebaruan metode. Konsekuensinya:
+
+- **Jalur produk:** kuesioner adaptif (information gain) seperti di website; dijelaskan sebagai
+  fitur dan algoritma produk.
+- **Pearson Correlation (60 butir)** tetap ada di kode sebagai metode baku O*NET dan pembanding.
+- **PPR** cukup ditulis sebagai pendekatan awal yang sudah diukur dan ditinggalkan.
+- Pengujian diarahkan ke pengguna: uji fungsi, kemudahan pakai, dan penerimaan siswa serta guru BK.
 - Judul lama (Knowledge Graph + PPR) boleh diganti; sudah dikonfirmasi oleh pemilik proyek.
+- Dikerjakan berkelompok, belum ada mitra sekolah, keluaran wajib berupa laporan sesuai panduan.
+- **Tenggat: sekitar 30 Oktober 2026** (empat minggu dari 2 Oktober 2026).
 
 ## 2. Alur sistem
 
@@ -164,7 +173,7 @@ lengkap tetap 4,7-4,9 dari 10.
 
 Jalankan: `.venv/bin/uvicorn web.app:app --reload`, lalu buka http://127.0.0.1:8000
 (lingkungan: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`).
-Tes: `.venv/bin/python -m unittest discover tests` (36 tes; tes web dilewati tanpa FastAPI).
+Tes: `.venv/bin/python -m unittest discover tests` (42 tes; tes web dilewati tanpa FastAPI).
 
 - `web/app.py`: API FastAPI. `POST /api/sessions`, `GET /api/sessions/{id}`,
   `POST /api/sessions/{id}/answers`, `POST /api/sessions/{id}/finish`,
@@ -194,13 +203,48 @@ Semua teks yang dilihat siswa sudah berbahasa Indonesia:
   (misalnya Nurse Practitioners, Physician Assistants). Nama asli O*NET tampil di halaman detail.
 - "English Language" diterjemahkan harfiah menjadi "Bahasa Inggris".
 
+## 5f. Fitur untuk uji coba pengguna
+
+- **Persetujuan.** Halaman awal menjelaskan penggunaan data; sesi tidak bisa dibuat tanpa `consent`.
+  Ada kolom opsional "kode dari guru" (`cohort`) untuk memisahkan kelas atau putaran uji.
+- **Alasan rekomendasi.** Tiap kartu hasil menampilkan bidang dan aktivitas yang disukai siswa dan
+  memang kuat di pekerjaan itu (`Session.reasons`).
+- **Penilaian siswa.** Setelah hasil: kesesuaian (1-5), kemudahan (1-5), pekerjaan yang menarik,
+  komentar, dan System Usability Scale 10 butir (opsional; skor 0-100). Susunan kata SUS mengikuti
+  versi Indonesia Sharfina & Santoso (2016) dari ingatan; cocokkan dengan sumber aslinya.
+- **Ekspor data.** `GET /api/admin/sessions.csv?token=...` dan `/api/admin/answers.csv?token=...`.
+  Aktif hanya jika variabel lingkungan `CRS_ADMIN_TOKEN` diisi; tanpa token yang benar balasannya 404.
+- **Detail pekerjaan.** Jenjang pendidikan yang dibutuhkan (persen pekerja, data AS), lima sifat
+  kerja terpenting, dan perangkat lunak yang banyak dicari (`crs/details.py`; tabel
+  `data/onet_education.csv`, `onet_work_styles.csv`, `onet_software.csv`).
+- Belum dikerjakan: tugas sehari-hari dan contoh tingkat kompetensi (butuh terjemahan tambahan).
+
+## 5g. Tampilan Streamlit (jalur utama untuk dipasang)
+
+Kelompok memilih Streamlit agar bisa dipasang gratis di Streamlit Community Cloud.
+
+- `streamlit_app.py`: halaman awal dengan persetujuan, kuesioner adaptif, hasil dengan alasan dan
+  detail (di dalam "Lihat detail"), form penilaian, dan halaman ekspor (`?admin=1`).
+- Keadaan sesi ada di `st.session_state`; alamat memuat `?s=<kode sesi>` sehingga muat ulang halaman
+  melanjutkan dari jawaban tersimpan.
+- `crs/service.py`: isi halaman dan ekspor, dipakai Streamlit dan FastAPI.
+- `crs/storage.py`: SQLite (lokal) atau Postgres bila `DATABASE_URL` diisi. Di Streamlit Cloud berkas
+  lokal bisa hilang, jadi Postgres daring wajib dipakai. Sudah diuji pada Postgres 16 lokal, termasuk
+  sambung ulang setelah koneksi putus dan melanjutkan sesi setelah server dinyalakan ulang.
+- Rahasia: `DATABASE_URL` dan `ADMIN_TOKEN` di Secrets Streamlit Cloud atau `.streamlit/secrets.toml`
+  (tidak di-commit). Langkah pemasangan ada di `README.md`.
+- Tes: 52 (`.venv/bin/python -m unittest discover tests`); tes Postgres hanya jalan bila
+  `TEST_DATABASE_URL` diisi.
+- Belum dilakukan: pemasangan sungguhan ke Streamlit Cloud dan Postgres daring (butuh akun kelompok).
+- `web/` (FastAPI) tetap ada sebagai tampilan alternatif dan memakai modul yang sama.
+
 ## 6. Yang belum ada
 
 1. **Uji ke siswa SMA sungguhan** dan penilaian guru BK. Semua angka di atas dari siswa sintetis.
 2. **Validasi terjemahan kuesioner.** Terjemahan dibuat untuk proyek ini dan belum divalidasi;
    lisensi O*NET Tools Developer meminta validasi sebelum dirilis.
 3. **Validasi terjemahan** nama pekerjaan, deskripsi, kompetensi, dan aktivitas kerja (bagian 5e).
-4. **Pemasangan website ke internet.** Website sudah ada (bagian 5d) tetapi baru berjalan lokal.
+4. **Pemasangan ke internet.** Aplikasi Streamlit siap dipasang (bagian 5g), tetapi belum dipasang.
 
 ## 7. Aturan untuk yang melanjutkan
 

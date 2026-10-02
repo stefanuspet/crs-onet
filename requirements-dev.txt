@@ -1,0 +1,6 @@
+# Untuk pengembangan: tes, tampilan FastAPI, dan skrip eksperimen
+-r requirements.txt
+scipy
+fastapi
+uvicorn
+httpx

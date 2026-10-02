@@ -1,5 +1,4 @@
+# Yang dibutuhkan aplikasi Streamlit (dipasang otomatis oleh Streamlit Community Cloud)
 numpy
-scipy
-fastapi
-uvicorn
-httpx
+streamlit
+psycopg[binary]

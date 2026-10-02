@@ -178,6 +178,16 @@ class Session:
         liked = [(a, q.text) for q, a in self.history if q.kind == "area" and a >= 3]
         return [text for _, text in sorted(liked, key=lambda x: -x[0])]
 
+    def reasons(self, occupation, limit=3):
+        """Why an occupation fits this student: (liked areas that are strong for it,
+        liked work activities that it involves)."""
+        pool = self.pool
+        areas = [q.text for q, a in self.history
+                 if q.kind == "area" and a >= 3 and pool.data.area_scores[occupation, q.index] >= 4.0]
+        activities = [q.text for q, a in self.history
+                      if q.kind == "dwa" and a >= 3 and pool.has_dwa[occupation, q.index] > 0]
+        return areas[:limit], activities[:limit]
+
     def _to_repeat(self):
         """Earlier questions to ask again: strongest answers first (a careless answer is least likely
         to land on the same extreme twice), then in the order they were asked."""

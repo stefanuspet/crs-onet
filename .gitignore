@@ -9,6 +9,9 @@ data/*.sqlite3-shm
 data/db_31_0_nt/
 data/*.zip
 
+# Rahasia aplikasi (alamat basis data dan kata sandi ekspor)
+.streamlit/secrets.toml
+
 # Lingkungan Python dan berkas hasil jalan
 .venv/
 __pycache__/

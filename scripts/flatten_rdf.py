@@ -14,6 +14,9 @@ Outputs (in data/):
     onet_ratings.csv              soc_code,title,domain,element_id,element_name,scale_id,value
     onet_related_occupations.csv  soc_code,related_soc_code,tier,rank
     onet_dwa.csv                  soc_code,dwa_id,dwa_name   (Detailed Work Activities, via the occupation's tasks)
+    onet_education.csv            soc_code,category,percent  (required level of education, categories 1..12)
+    onet_work_styles.csv          soc_code,style,impact      (Work Styles Impact scale, -3..3)
+    onet_software.csv             soc_code,software,in_demand,hot_technology
 """
 import csv
 import re
@@ -60,6 +63,7 @@ def main():
     rating_owner = {}   # rating iri -> occupation iri
     related_owner = {}  # linkage iri -> occupation iri
     task_owner = {}     # task iri -> occupation iri
+    software_owner = {}  # software linkage iri -> occupation iri
     for s, p, o, lit in triples("Occupation.nt"):
         if p == "onetSOCCode":
             occupations.setdefault(s, {})["code"] = lit
@@ -73,6 +77,8 @@ def main():
             related_owner[o] = s
         elif p == "hasTask":
             task_owner[o] = s
+        elif p == "hasSoftware":
+            software_owner[o] = s
 
     zone_number = {s: lit for s, p, _, lit in triples("JobZone.nt") if p == "jobZone"}
     for s, p, o, _ in triples("JobZoneRating.nt"):
@@ -142,6 +148,63 @@ def main():
         w.writerow(["soc_code", "dwa_id", "dwa_name"])
         w.writerows(sorted(pairs))
     print(f"onet_dwa.csv: {len(pairs):,} rows")
+
+    def write(name, header, rows):
+        with open(OUT_DIR / name, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(header)
+            w.writerows(sorted(rows))
+        print(f"{name}: {len(rows):,} rows")
+
+    # Required education: share of workers naming each category (scale RL, or RQ where RL is absent).
+    category = {s: int(lit) for s, p, _, lit in triples("EducationCategory.nt") if p == "category"}
+    ratings = {}
+    for s, p, o, lit in triples("EducationRating.nt"):
+        r = ratings.setdefault(s, {})
+        if p == "dataValue":
+            r["value"] = float(lit)
+        elif p == "refersTo" and o in category:
+            r["category"] = category[o]
+        elif p == "refersTo" and o in scales:
+            r["scale"] = scales[o]
+    by_scale = {}
+    for iri, r in ratings.items():
+        occ = occupations.get(rating_owner.get(iri))
+        if occ and "category" in r and r.get("scale") in ("RL", "RQ"):
+            by_scale.setdefault((occ["code"], r["scale"]), []).append((r["category"], r["value"]))
+    codes = {code for code, _ in by_scale}
+    write("onet_education.csv", ["soc_code", "category", "percent"],
+          [(code, c, v) for code in codes
+           for c, v in by_scale.get((code, "RL")) or by_scale[(code, "RQ")]])
+
+    ratings = {}
+    for s, p, o, lit in triples("WorkStylesRating.nt"):
+        r = ratings.setdefault(s, {})
+        if p == "dataValue":
+            r["value"] = float(lit)
+        elif p == "refersTo" and o in elements:
+            r["style"] = elements[o]["elementName"]
+        elif p == "refersTo" and o in scales:
+            r["scale"] = scales[o]
+    write("onet_work_styles.csv", ["soc_code", "style", "impact"],
+          [(occupations[rating_owner[iri]]["code"], r["style"], r["value"])
+           for iri, r in ratings.items() if r.get("scale") == "WI" and iri in rating_owner])
+
+    examples = {}
+    for s, p, _, lit in triples("SoftwareWorkplaceExample.nt"):
+        if p in ("workplaceExample", "hotTechnology"):
+            examples.setdefault(s, {})[p] = lit
+    links = {}
+    for s, p, o, lit in triples("SoftwareLinkage.nt"):
+        l = links.setdefault(s, {})
+        if p == "inDemand":
+            l["in_demand"] = lit
+        elif p == "refersTo" and o in examples:
+            l["example"] = examples[o]
+    write("onet_software.csv", ["soc_code", "software", "in_demand", "hot_technology"],
+          {(occupations[software_owner[iri]]["code"], l["example"]["workplaceExample"],
+            l.get("in_demand", "false"), l["example"].get("hotTechnology", "false"))
+           for iri, l in links.items() if "example" in l and iri in software_owner})
 
 
 if __name__ == "__main__":
