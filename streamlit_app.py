@@ -228,6 +228,9 @@ def view_admin():
         st.error("Kata sandi salah.")
         return
     st.caption(f"Penyimpanan: {store.backend} · {len(store.all_session_ids())} sesi tersimpan")
+    if store.backend == "sqlite":
+        st.warning("Data disimpan di berkas sementara di server ini dan bisa hilang saat aplikasi dinyalakan "
+                   "ulang. Cukup untuk demo; untuk uji coba ke siswa, isi DATABASE_URL (Postgres).")
     st.download_button("Unduh ringkasan sesi (sessions.csv)", service.export_sessions(store),
                        "sessions.csv", "text/csv")
     st.download_button("Unduh semua jawaban (answers.csv)", service.export_answers(store),

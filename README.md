@@ -5,8 +5,6 @@ Siswa menjawab kuesioner minat adaptif (setiap jawaban menentukan pertanyaan ber
 mendapat daftar pekerjaan yang mungkin cocok beserta alasannya, jenjang pendidikan, kompetensi
 yang perlu dikembangkan, dan karier serupa.
 
-Catatan rancangan, hasil uji, dan keterbatasan ada di [`CRS_Context.md`](CRS_Context.md).
-
 ## Menjalankan di komputer sendiri
 
 ```bash
@@ -25,13 +23,15 @@ Tes: `.venv/bin/python -m unittest discover tests`
 
 ## Memasang di Streamlit Community Cloud
 
-Berkas di server Streamlit Cloud bisa hilang saat aplikasi dinyalakan ulang, jadi jawaban siswa
-**harus** disimpan di Postgres daring.
+**Untuk demo**, cukup langkah 2: tanpa Secrets apa pun aplikasi tetap jalan dan menyimpan jawaban di
+berkas sementara. Berkas itu bisa hilang saat aplikasi dinyalakan ulang, jadi **untuk uji coba ke siswa**
+jawaban harus disimpan di Postgres daring (langkah 1, 3, dan 4).
 
-1. Buat basis data Postgres gratis (misalnya di Supabase atau Neon) dan salin alamat koneksinya
+1. Buat basis data Postgres gratis (misalnya di Neon) dan salin alamat koneksinya
    (`postgresql://...`). Tabel dibuat otomatis saat aplikasi pertama kali jalan.
 2. Di [share.streamlit.io](https://share.streamlit.io): **Create app** → pilih repo ini, cabang `main`,
-   berkas utama `streamlit_app.py`.
+   berkas utama `streamlit_app.py`. Kalau repo privat, jadikan aplikasinya publik di **Settings → Sharing**
+   supaya bisa dibuka tanpa undangan.
 3. Di **Advanced settings → Secrets**, isi (contoh ada di `.streamlit/secrets.toml.example`):
 
    ```toml

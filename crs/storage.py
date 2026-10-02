@@ -11,6 +11,7 @@ import json
 import os
 import secrets
 import sqlite3
+import tempfile
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -64,15 +65,28 @@ class Store:
         self._lock = threading.Lock()
         self._pg = None
         self._ready_for = None   # SQLite path whose schema has been prepared
+        self._fallback = None    # temporary SQLite path, used when the default one is not writable
 
     @property
     def backend(self):
         return "postgres" if self.database_url else "sqlite"
 
     # ---- connections
+    def sqlite_path(self):
+        return Path(os.environ.get("CRS_DB") or self._fallback or DEFAULT_DB)
+
     def _sqlite(self):
-        path = Path(os.environ.get("CRS_DB", DEFAULT_DB))
-        conn = sqlite3.connect(path)
+        path = self.sqlite_path()
+        try:
+            conn = sqlite3.connect(path)
+            conn.execute("BEGIN IMMEDIATE")   # takes the write lock: fails here if the file cannot be written
+            conn.rollback()
+        except sqlite3.OperationalError:
+            # Read-only or missing folder on the host: keep the app usable with a temporary file.
+            if os.environ.get("CRS_DB") or self._fallback:
+                raise
+            self._fallback = Path(tempfile.gettempdir()) / "crs.sqlite3"
+            return self._sqlite()
         conn.row_factory = sqlite3.Row
         if self._ready_for != path:
             for ddl in TABLES:

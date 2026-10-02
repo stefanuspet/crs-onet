@@ -65,6 +65,23 @@ class SqliteStorageTest(StorageContract, unittest.TestCase):
     def test_backend(self):
         self.assertEqual(self.store.backend, "sqlite")
 
+    def test_falls_back_to_a_temporary_file_when_the_data_folder_is_not_writable(self):
+        from crs import storage
+        os.environ.pop("CRS_DB")
+        original = storage.DEFAULT_DB
+        storage.DEFAULT_DB = os.path.join(self.tmp.name, "tidak", "ada", "crs.sqlite3")
+        fallback = os.path.join(tempfile.gettempdir(), "crs.sqlite3")
+        existed = os.path.exists(fallback)
+        try:
+            store = Store()
+            sid = store.create_session(consent=True)
+            self.assertIsNotNone(store.get_session(sid))
+            self.assertEqual(str(store.sqlite_path()), fallback)
+        finally:
+            storage.DEFAULT_DB = original
+            if not existed and os.path.exists(fallback):
+                os.remove(fallback)
+
     def test_old_database_gets_the_new_columns(self):
         conn = sqlite3.connect(os.environ["CRS_DB"])
         conn.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, max_job_zone INTEGER, "

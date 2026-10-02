@@ -25,3 +25,7 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
+
+# Catatan kerja (hanya di komputer ini)
+CRS_Context.md
+CRS_ONET_Knowledge_Graph_PPR_Context.md
